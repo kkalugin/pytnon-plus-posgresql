@@ -1,0 +1,69 @@
+def chunk_loader(table_name, col_list, df, chunk, conn):
+
+    # rearrange DF
+    df = df[col_list]
+
+    i = 0
+    total_row = df.shape[0] 
+    total_iteration = total_row // chunk
+
+    cur = conn.cursor()
+
+    while i <= total_iteration:
+        #print(f"{i=}")
+        first_id = i * chunk
+        last_id = min(total_row - 1, (i + 1) * chunk - 1)
+        #print(f"{last_id=}")
+
+        print(f"Inserting rows from {first_id} to {last_id} to {table_name}")
+
+        # slice DF    
+        df_chunk = df.loc[first_id:last_id]
+
+        # create values string
+        values = str([tuple(x) for x in df_chunk.to_numpy()])[1:-1]
+
+        #create INSERT INTO statement
+        columns = ', '.join(x for x in col_list)
+        insert_stmt = f"INSERT INTO {table_name} ({columns}) VALUES {values}"
+
+        cur.execute(insert_stmt)
+        conn.commit()
+        # go next
+        i += 1
+    
+    print(f"{table_name} done!")
+    cur.close()
+
+def truncate(table_name, conn):
+    cur = conn.cursor()
+    truncate_stmt = f"TRUNCATE TABLE {table_name}"
+    cur.execute(truncate_stmt)
+    conn.commit()
+
+
+conn = psycopg2.connect("host='localhost' port='5432' dbname='de' user='jovyan' password='jovyan'")
+chunk = 10000
+
+# customer_research
+table_name = 'stage.customer_research'
+col_list = ['id', 'date_id', 'category_id' ,'geo_id', 'sales_qty', 'sales_amt']
+
+truncate(table_name, conn = conn)
+chunk_loader(table_name, col_list, df = df_customer_research, chunk=chunk, conn=conn)
+
+# user_activity_log
+table_name = 'stage.user_activity_log'
+col_list = ['id', 'date_time', 'action_id', 'customer_id', 'quantity']
+
+truncate(table_name, conn = conn)
+chunk_loader(table_name, col_list, df = df_user_activity_log, chunk=chunk, conn=conn)
+
+# user_order_log
+table_name = 'stage.user_order_log'
+col_list = ['id', 'date_time', 'city_id', 'city_name', 'customer_id', 'first_name', 'last_name', 'item_id', 'item_name', 'quantity', 'payment_amount']
+
+truncate(table_name, conn = conn)
+chunk_loader(table_name, col_list, df = df_user_order_log, chunk=chunk, conn=conn)
+
+conn.close()
